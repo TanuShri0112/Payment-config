@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { FiEdit2, FiTrash2, FiDollarSign, FiCheck, FiX } from 'react-icons/fi';
 import './PlanCreationForm.css';
+import productPlanService from '../services/productPlanService';
 
 const PlanCreationForm = () => {
   const [view, setView] = useState('list'); // 'list' or 'edit'
@@ -11,15 +13,28 @@ const PlanCreationForm = () => {
   const [submitMessage, setSubmitMessage] = useState('');
   const [activePlanIndex, setActivePlanIndex] = useState(0);
   const [previewProductId, setPreviewProductId] = useState(null);
+  const [filterType, setFilterType] = useState('all'); // Filter state
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false); // Dropdown state
+  const [deleteModal, setDeleteModal] = useState({ show: false, planId: null, productId: null, planIndex: null }); // Delete modal state
+
+  // Utility functions for currency conversion
+  const dollarsToCents = (dollars) => {
+    return Math.round(parseFloat(dollars) * 100);
+  };
+
+  const centsToDollars = (cents) => {
+    return (cents / 100).toFixed(2);
+  };
 
   const products = [
-    { id: 'course', name: 'AI Powered Course Creation', desc: 'Design complete, interaction-rich learning experiences in 15 minutes.' },
-    { id: 'designova', name: 'Designova AI', desc: '' },
-    { id: 'athenora', name: 'Athenora Live', desc: '' },
-    { id: 'ebook', name: 'E-Book Athena', desc: '' },
-    { id: 'operon', name: 'Operon AI: ChatBot Agent', desc: '' },
-    { id: 'lms', name: 'Athena LMS', desc: '' },
-    { id: 'buildora', name: 'Buildora', desc: '' }
+    { id: '325b5f10-640f-49f4-8ebf-a6aca823233c', name: 'E-Book Athena', desc: 'Create and sell digital e-books with AI assistance' },
+    { id: '5a75ebfd-ad81-49e4-8115-7040aff78030', name: 'Designova AI', desc: 'AI-powered design tool for creating stunning visuals' },
+    // Add other products here as you get their UUIDs from backend
+    // { id: 'another-uuid-here', name: 'AI Powered Course Creation', desc: 'Design complete, interaction-rich learning experiences in 15 minutes.' },
+    // { id: 'another-uuid-here', name: 'Athenora Live', desc: '' },
+    // { id: 'another-uuid-here', name: 'Operon AI: ChatBot Agent', desc: '' },
+    // { id: 'another-uuid-here', name: 'Athena LMS', desc: '' },
+    // { id: 'another-uuid-here', name: 'Buildora', desc: '' }
   ];
 
   const intervalOptions = ['MONTH', 'YEAR', 'DAY', 'WEEK'];
@@ -82,6 +97,13 @@ const PlanCreationForm = () => {
     plans.forEach((plan, index) => {
       if (!plan.name.trim()) newErrors[`name-${index}`] = 'Required';
       if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) newErrors[`price-${index}`] = 'Invalid';
+      
+      // Validate book ID for E-Book product with one-time payment
+      if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+        if (!plan.bookId || plan.bookId.trim() === '') {
+          newErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
+        }
+      }
     });
 
     setErrors(newErrors);
@@ -95,6 +117,13 @@ const PlanCreationForm = () => {
     const plan = plans[index];
     if (!plan.name.trim()) newErrors[`name-${index}`] = 'Required';
     if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) newErrors[`price-${index}`] = 'Invalid';
+    
+    // Validate book ID for E-Book product with one-time payment
+    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+      if (!plan.bookId || plan.bookId.trim() === '') {
+        newErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
+      }
+    }
 
     setErrors(prev => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).every(key => !key.endsWith(`-${index}`) && key !== 'product') ||
@@ -102,58 +131,99 @@ const PlanCreationForm = () => {
   };
 
   const handleSavePlan = async (index) => {
+    const plan = plans[index];
+    
+    // If plan already has an ID, update it instead of creating
+    if (plan.planId) {
+      return handleUpdatePlan(index);
+    }
+
     // Basic validation for this specific plan
     const planErrors = {};
     if (!selectedProduct) planErrors.product = 'Required';
-    if (!plans[index].name.trim()) planErrors[`name-${index}`] = 'Required';
-    if (!plans[index].price || isNaN(plans[index].price) || Number(plans[index].price) <= 0) planErrors[`price-${index}`] = 'Invalid';
+    if (!plan.name.trim()) planErrors[`name-${index}`] = 'Required';
+    if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) planErrors[`price-${index}`] = 'Invalid';
+    
+    // Validate book ID for E-Book product with one-time payment
+    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+      if (!plan.bookId || plan.bookId.trim() === '') {
+        planErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
+      }
+    }
 
     if (Object.keys(planErrors).length > 0) {
       setErrors(prev => ({ ...prev, ...planErrors }));
       return;
     }
 
-    // Prepare payload
+    // Prepare payload for backend API
     const planPayload = {
       productId: selectedProduct,
-      ...plans[index],
-      price: parseInt(plans[index].price)
+      name: plan.name,
+      description: plan.description,
+      price: dollarsToCents(plan.price), // Convert dollars to cents
+      currency: plan.currency || 'USD',
+      billingType: plan.billingType,
+      interval: plan.interval,
+      intervalCount: plan.intervalCount,
+      isActive: plan.isActive,
+      metadata: {} // Add any additional metadata if needed
     };
 
-    console.log('Saving individual plan:', planPayload);
+    // Add book ID to metadata for E-Book product with one-time payment
+    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME' && plan.bookId) {
+      planPayload.metadata.bookId = plan.bookId;
+    }
 
-    // Simulate API call
+    console.log('Saving individual plan to backend:', planPayload);
+
+    // Call backend API
     handlePlanChange(index, 'isSaving', true);
 
-    await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      const result = await productPlanService.createPlan(planPayload);
+      
+      handlePlanChange(index, 'isSaving', false);
+      handlePlanChange(index, 'lastSaved', new Date().toLocaleTimeString());
+      handlePlanChange(index, 'isModified', false);
+      handlePlanChange(index, 'planId', result.data?.id || result.planId); // Store the returned plan ID
 
-    handlePlanChange(index, 'isSaving', false);
-    handlePlanChange(index, 'lastSaved', new Date().toLocaleTimeString());
-    handlePlanChange(index, 'isModified', false); // Reset modified flag after saving
+      // Update local storage/state for consistency
+      const updatedConfigs = [...savedConfigs];
+      const existingIndex = updatedConfigs.findIndex(c => c.productId === selectedProduct);
 
-    // Update local storage/state for consistency
-    const updatedConfigs = [...savedConfigs];
-    const existingIndex = updatedConfigs.findIndex(c => c.productId === selectedProduct);
+      if (existingIndex >= 0) {
+        const existingPlans = [...updatedConfigs[existingIndex].plans];
+        existingPlans[index] = { ...planPayload, planId: result.data?.id || result.planId };
+        updatedConfigs[existingIndex] = { ...updatedConfigs[existingIndex], plans: existingPlans, timestamp: new Date().toLocaleString() };
+      } else {
+        updatedConfigs.push({
+          productId: selectedProduct,
+          productName: products.find(p => p.id === selectedProduct)?.name,
+          plans: [{ ...planPayload, planId: result.data?.id || result.planId }],
+          timestamp: new Date().toLocaleString()
+        });
+      }
+      setSavedConfigs(updatedConfigs);
 
-    if (existingIndex >= 0) {
-      const existingPlans = [...updatedConfigs[existingIndex].plans];
-      existingPlans[index] = planPayload;
-      updatedConfigs[existingIndex] = { ...updatedConfigs[existingIndex], plans: existingPlans, timestamp: new Date().toLocaleString() };
-    } else {
-      updatedConfigs.push({
-        productId: selectedProduct,
-        productName: products.find(p => p.id === selectedProduct)?.name,
-        plans: [planPayload],
-        timestamp: new Date().toLocaleString()
-      });
-    }
-    setSavedConfigs(updatedConfigs);
+      // Show success message
+      setSubmitMessage(`✅ Plan "${plan.name}" saved successfully!`);
+      setTimeout(() => setSubmitMessage(''), 3000);
 
-    // Auto-switch to next plan if available
-    if (index < plans.length - 1) {
-      setTimeout(() => {
-        setActivePlanIndex(index + 1);
-      }, 800);
+      // Auto-switch to next plan if available
+      if (index < plans.length - 1) {
+        setTimeout(() => {
+          setActivePlanIndex(index + 1);
+        }, 800);
+      }
+
+    } catch (error) {
+      console.error('Error saving plan:', error);
+      handlePlanChange(index, 'isSaving', false);
+      setErrors(prev => ({ 
+        ...prev, 
+        [`save-${index}`]: error.message || 'Failed to save plan. Please try again.' 
+      }));
     }
   };
 
@@ -161,17 +231,49 @@ const PlanCreationForm = () => {
     e.preventDefault();
     if (!validate()) return;
 
-    // Check if all plans are saved
-    const allPlansSaved = plans.every(p => p.lastSaved && !p.isModified);
+    // Debug: Log current plan states
+    console.log('Plan states for validation:', plans.map(p => ({
+      name: p.name,
+      planId: p.planId,
+      lastSaved: p.lastSaved,
+      isModified: p.isModified
+    })));
+
+    // Check if all plans are saved - improved logic
+    const allPlansSaved = plans.every(p => {
+      // Plan is saved if it has a planId (from backend) OR has lastSaved timestamp and not modified
+      const isSaved = (p.planId || (p.lastSaved && !p.isModified));
+      console.log(`Plan "${p.name}": planId=${p.planId}, lastSaved=${p.lastSaved}, isModified=${p.isModified}, isSaved=${isSaved}`);
+      return isSaved;
+    });
+    
+    console.log('All plans saved?', allPlansSaved);
+    
     if (!allPlansSaved) {
       setErrors(prev => ({ ...prev, global: 'Please save each plan individually before finishing.' }));
       return;
     }
 
+    // Find existing configuration for this product
+    const existingConfig = savedConfigs.find(c => c.productId === selectedProduct);
+    
+    let mergedPlans;
+    if (existingConfig && existingConfig.plans) {
+      // Merge existing plans with new plans, avoiding duplicates
+      const existingPlanIds = new Set(existingConfig.plans.map(p => p.planId).filter(Boolean));
+      const newPlansToAdd = plans.filter(p => p.planId && !existingPlanIds.has(p.planId));
+      
+      mergedPlans = [...existingConfig.plans, ...newPlansToAdd];
+      console.log('Merged plans:', mergedPlans);
+    } else {
+      // No existing plans, use current plans
+      mergedPlans = plans.map(p => ({ ...p, price: parseInt(p.price) }));
+    }
+
     const newConfig = {
       productId: selectedProduct,
       productName: products.find(p => p.id === selectedProduct)?.name,
-      plans: plans.map(p => ({ ...p, price: parseInt(p.price) })),
+      plans: mergedPlans,
       timestamp: new Date().toLocaleString()
     };
 
@@ -207,6 +309,11 @@ const PlanCreationForm = () => {
   };
 
   const addNew = (productId = '') => {
+    // If already in edit view, don't do anything to prevent UI vanishing
+    if (view === 'edit') {
+      return;
+    }
+    
     setSelectedProduct(productId);
     setPlans([]); // Clear plans to allow fresh initialization
     setErrors({});
@@ -215,6 +322,227 @@ const PlanCreationForm = () => {
     setView('edit');
   };
 
+  // Update existing plan
+  const handleUpdatePlan = async (index) => {
+    const plan = plans[index];
+    if (!plan.planId) {
+      // If no planId, treat as create
+      return handleSavePlan(index);
+    }
+
+    // Basic validation
+    const planErrors = {};
+    if (!selectedProduct) planErrors.product = 'Required';
+    if (!plan.name.trim()) planErrors[`name-${index}`] = 'Required';
+    if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) planErrors[`price-${index}`] = 'Invalid';
+    
+    // Validate book ID for E-Book product with one-time payment
+    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+      if (!plan.bookId || plan.bookId.trim() === '') {
+        planErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
+      }
+    }
+
+    if (Object.keys(planErrors).length > 0) {
+      setErrors(prev => ({ ...prev, ...planErrors }));
+      return;
+    }
+
+    // Prepare payload for backend API
+    const planPayload = {
+      productId: selectedProduct,
+      name: plan.name,
+      description: plan.description,
+      price: dollarsToCents(plan.price), // Convert dollars to cents
+      currency: plan.currency || 'USD',
+      billingType: plan.billingType,
+      interval: plan.interval,
+      intervalCount: plan.intervalCount,
+      isActive: plan.isActive,
+      metadata: {}
+    };
+
+    // Add book ID to metadata for E-Book product with one-time payment
+    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME' && plan.bookId) {
+      planPayload.metadata.bookId = plan.bookId;
+    }
+
+    console.log('Updating plan to backend:', planPayload);
+
+    handlePlanChange(index, 'isSaving', true);
+
+    try {
+      const result = await productPlanService.updatePlan(plan.planId, planPayload);
+      
+      handlePlanChange(index, 'isSaving', false);
+      handlePlanChange(index, 'lastSaved', new Date().toLocaleTimeString());
+      handlePlanChange(index, 'isModified', false);
+
+      // Update local storage/state
+      const updatedConfigs = [...savedConfigs];
+      const existingIndex = updatedConfigs.findIndex(c => c.productId === selectedProduct);
+
+      if (existingIndex >= 0) {
+        const existingPlans = [...updatedConfigs[existingIndex].plans];
+        existingPlans[index] = { ...planPayload, planId: plan.planId };
+        updatedConfigs[existingIndex] = { ...updatedConfigs[existingIndex], plans: existingPlans, timestamp: new Date().toLocaleString() };
+        setSavedConfigs(updatedConfigs);
+      }
+
+      setSubmitMessage(`✅ Plan "${plan.name}" updated successfully!`);
+      setTimeout(() => setSubmitMessage(''), 3000);
+
+    } catch (error) {
+      console.error('Error updating plan:', error);
+      handlePlanChange(index, 'isSaving', false);
+      setErrors(prev => ({ 
+        ...prev, 
+        [`save-${index}`]: error.message || 'Failed to update plan. Please try again.' 
+      }));
+    }
+  };
+
+  // Show delete confirmation modal
+  const showDeleteModal = (planId, productId, planIndex) => {
+    setDeleteModal({
+      show: true,
+      planId,
+      productId,
+      planIndex
+    });
+  };
+
+  // Hide delete modal
+  const hideDeleteModal = () => {
+    setDeleteModal({ show: false, planId: null, productId: null, planIndex: null });
+  };
+
+  // Confirm delete
+  const confirmDelete = async () => {
+    const { planId, productId, planIndex } = deleteModal;
+    if (!planId) {
+      console.warn('Cannot delete plan without ID');
+      hideDeleteModal();
+      return;
+    }
+
+    try {
+      await productPlanService.deletePlan(planId);
+      
+      // Update local state
+      const updatedConfigs = [...savedConfigs];
+      const configIndex = updatedConfigs.findIndex(c => c.productId === productId);
+      
+      if (configIndex >= 0) {
+        updatedConfigs[configIndex].plans = updatedConfigs[configIndex].plans.filter(p => p.planId !== planId);
+        
+        // Remove the entire config if no plans left
+        if (updatedConfigs[configIndex].plans.length === 0) {
+          updatedConfigs.splice(configIndex, 1);
+        }
+        
+        setSavedConfigs(updatedConfigs);
+      }
+      
+      setSubmitMessage('✅ Plan deleted successfully!');
+      setTimeout(() => setSubmitMessage(''), 3000);
+
+    } catch (error) {
+      console.error('Error deleting plan:', error);
+      setSubmitMessage(`❌ Failed to delete plan: ${error.message}`);
+      setTimeout(() => setSubmitMessage(''), 3000);
+    } finally {
+      hideDeleteModal();
+    }
+  };
+
+  // Delete plan
+  const handleDeletePlan = (planId, productId, planIndex) => {
+    showDeleteModal(planId, productId, planIndex);
+  };
+
+  // Check if current plan is valid for saving
+  const isCurrentPlanValid = () => {
+    // First check if product is selected
+    if (!selectedProduct) return false;
+    
+    const plan = plans[activePlanIndex];
+    if (!plan) return false;
+    
+    // Check required fields
+    if (!plan.name || plan.name.trim() === '') return false;
+    if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) return false;
+    
+    // Check book ID for E-Book product with one-time payment
+    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+      if (!plan.bookId || plan.bookId.trim() === '') return false;
+    }
+    
+    return true;
+  };
+
+  // Load existing plans from backend
+  const loadPlansFromBackend = async (productName = '') => {
+    try {
+      const result = await productPlanService.getAllPlans(productName);
+      if (result.success && result.data) {
+        // Group plans by productId
+        const plansByProduct = result.data.reduce((acc, plan) => {
+          const productId = plan.productId;
+          if (!acc[productId]) {
+            acc[productId] = {
+              productId,
+              productName: products.find(p => p.id === productId)?.name || productId,
+              plans: [],
+              timestamp: new Date(plan.createdAt).toLocaleString()
+            };
+          }
+          acc[productId].plans.push({
+            ...plan,
+            planId: plan.id,
+            price: parseFloat(centsToDollars(plan.price)), // Convert cents to dollars
+            isModified: false,
+            isSaving: false,
+            lastSaved: new Date(plan.createdAt).toLocaleTimeString()
+          });
+          return acc;
+        }, {});
+        
+        setSavedConfigs(Object.values(plansByProduct));
+        console.log('Refreshed plans from backend:', Object.values(plansByProduct));
+      }
+    } catch (error) {
+      console.error('Error loading plans:', error);
+      // Don't show error to user on initial load, just log it
+    }
+  };
+
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showFilterDropdown && !event.target.closest('.filter-dropdown')) {
+        setShowFilterDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFilterDropdown]);
+
+  // Load plans on component mount
+  useEffect(() => {
+    loadPlansFromBackend();
+  }, []);
+
+  // Auto-refresh when switching to list view
+  useEffect(() => {
+    if (view === 'list') {
+      loadPlansFromBackend();
+    }
+  }, [view]);
+
   // Sync preview ID if not set
   useEffect(() => {
     if (products.length > 0 && !previewProductId) {
@@ -222,8 +550,50 @@ const PlanCreationForm = () => {
     }
   }, [previewProductId]);
 
+  // Get filter display label
+  const getFilterLabel = () => {
+    switch (filterType) {
+      case 'recurring': return 'Recurring';
+      case 'onetime': return 'One-Time';
+      case 'active': return 'Active';
+      case 'inactive': return 'Inactive';
+      default: return 'All Plans';
+    }
+  };
+
+  // Get filter count
+  const getFilterCount = () => {
+    if (!activeConfig) return 0;
+    switch (filterType) {
+      case 'recurring': return activeConfig.plans.filter(p => p.billingType === 'RECURRING').length;
+      case 'onetime': return activeConfig.plans.filter(p => p.billingType === 'ONE_TIME').length;
+      case 'active': return activeConfig.plans.filter(p => p.isActive === true).length;
+      case 'inactive': return activeConfig.plans.filter(p => p.isActive === false).length;
+      default: return activeConfig.plans.length;
+    }
+  };
+
+  // Filter plans based on selected filter type
+  const filterPlans = (plans) => {
+    switch (filterType) {
+      case 'recurring':
+        return plans.filter(plan => plan.billingType === 'RECURRING');
+      case 'onetime':
+        return plans.filter(plan => plan.billingType === 'ONE_TIME');
+      case 'active':
+        return plans.filter(plan => plan.isActive === true);
+      case 'inactive':
+        return plans.filter(plan => plan.isActive === false);
+      default:
+        return plans; // 'all' case
+    }
+  };
+
   const activeConfig = savedConfigs.find(c => c.productId === previewProductId);
   const activeProduct = products.find(p => p.id === previewProductId);
+  
+  // Get filtered plans for display
+  const filteredPlans = activeConfig ? filterPlans(activeConfig.plans) : [];
 
   // Scroll to top on navigation/switch
   useEffect(() => {
@@ -276,46 +646,108 @@ const PlanCreationForm = () => {
                     <h3>{activeConfig.productName} Plans</h3>
                     <p>Last updated: {activeConfig.timestamp}</p>
                   </div>
-                  <button onClick={() => startEdit(activeConfig)} className="edit-config-btn">
-                    Edit All Plans
-                  </button>
+                  <div className="header-actions">
+                    <div className="filter-dropdown">
+                      <button 
+                        className="filter-dropdown-btn"
+                        onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                      >
+                        <span className="filter-label-text">{getFilterLabel()} ({getFilterCount()})</span>
+                        <span className={`dropdown-arrow ${showFilterDropdown ? 'open' : ''}`}>▼</span>
+                      </button>
+                      {showFilterDropdown && (
+                        <div className="dropdown-menu">
+                          <button
+                            className={`dropdown-item ${filterType === 'all' ? 'active' : ''}`}
+                            onClick={() => { setFilterType('all'); setShowFilterDropdown(false); }}
+                          >
+                            All Plans ({activeConfig.plans.length})
+                          </button>
+                          <button
+                            className={`dropdown-item ${filterType === 'recurring' ? 'active' : ''}`}
+                            onClick={() => { setFilterType('recurring'); setShowFilterDropdown(false); }}
+                          >
+                            Recurring ({activeConfig.plans.filter(p => p.billingType === 'RECURRING').length})
+                          </button>
+                          <button
+                            className={`dropdown-item ${filterType === 'onetime' ? 'active' : ''}`}
+                            onClick={() => { setFilterType('onetime'); setShowFilterDropdown(false); }}
+                          >
+                            One-Time ({activeConfig.plans.filter(p => p.billingType === 'ONE_TIME').length})
+                          </button>
+                          <button
+                            className={`dropdown-item ${filterType === 'active' ? 'active' : ''}`}
+                            onClick={() => { setFilterType('active'); setShowFilterDropdown(false); }}
+                          >
+                            Active ({activeConfig.plans.filter(p => p.isActive === true).length})
+                          </button>
+                          <button
+                            className={`dropdown-item ${filterType === 'inactive' ? 'active' : ''}`}
+                            onClick={() => { setFilterType('inactive'); setShowFilterDropdown(false); }}
+                          >
+                            Inactive ({activeConfig.plans.filter(p => p.isActive === false).length})
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => startEdit(activeConfig)} className="edit-config-btn">
+                      Edit All Plans
+                    </button>
+                  </div>
                 </div>
 
-                <div className="pricing-grid">
-                  {activeConfig.plans.map((plan, idx) => (
-                    <div key={idx} className={`pricing-card card-variant-${idx % 3}`}>
-                      <div className="card-top">
-                        <span className="card-tag">Plan {idx + 1}</span>
-                        <h4>{plan.name}</h4>
-                      </div>
-
-                      <div className="card-price">
-                        <span className="currency">$</span>
-                        <span className="amount">{plan.price}</span>
-                        <span className="period">/{plan.interval?.toLowerCase()}</span>
-                      </div>
-
-                      <div className="card-desc">
-                        <p>{plan.description || "No description provided."}</p>
-                      </div>
-
-                      <div className="card-features">
-                        <ul>
-                          <li><span className="check">✓</span> {plan.billingType === 'RECURRING' ? 'Recurring Access' : 'One-time Payment'}</li>
-                          <li><span className="check">✓</span> Status: {plan.isActive ? 'Active' : 'Inactive'}</li>
-                        </ul>
-                      </div>
-
-                      <div className="card-action">
-                        <button
-                          className="preview-btn"
-                          onClick={() => startEdit(activeConfig, idx)}
-                        >
-                          Edit Plan
-                        </button>
-                      </div>
+                <div className="plans-list">
+                  {filteredPlans.length === 0 ? (
+                    <div className="no-plans-list">
+                      <FiX className="no-plans-icon" />
+                      <p>No plans found for the selected filter.</p>
+                      <button onClick={() => setFilterType('all')} className="plan-edit-btn">
+                        Show All Plans
+                      </button>
                     </div>
-                  ))}
+                  ) : (
+                    filteredPlans.map((plan, idx) => (
+                      <div key={idx} className="plan-item">
+                        <div className="plan-main-info">
+                          <div className="plan-header">
+                            <h4 className="plan-name">{plan.name}</h4>
+                            <div className="plan-price">
+                              <FiDollarSign className="price-icon" />
+                              <span>{plan.price}</span>
+                            </div>
+                          </div>
+                          {plan.description && (
+                            <p className="plan-description">{plan.description}</p>
+                          )}
+                          <div className="plan-meta">
+                            <span className={`plan-billing ${plan.billingType === 'RECURRING' ? 'recurring' : ''}`}>
+                              <FiCheck className="meta-icon" />
+                              {plan.billingType === 'RECURRING' ? 'Recurring' : 'One-Time'}
+                            </span>
+                            <span className={`plan-status ${plan.isActive ? 'active' : 'inactive'}`}>
+                              {plan.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="plan-actions">
+                          <button
+                            className="plan-edit-btn"
+                            onClick={() => startEdit(activeConfig, activeConfig.plans.indexOf(plan))}
+                            title="Edit plan"
+                          >
+                            <FiEdit2 />
+                          </button>
+                          <button
+                            className="plan-delete-btn"
+                            onClick={() => showDeleteModal(plan.planId, activeConfig.productId, activeConfig.plans.indexOf(plan))}
+                            title="Delete plan"
+                          >
+                            <FiTrash2 />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </>
             )}
@@ -459,17 +891,40 @@ const PlanCreationForm = () => {
                       </div>
                     </div>
 
+                    {/* Book ID field - only for E-Book product with one-time payment */}
+                    {selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plans[activePlanIndex].billingType === 'ONE_TIME' && (
+                      <div className="book-id-section">
+                        <label className="section-label">Book Information</label>
+                        <div className="field">
+                          <label>Book ID*</label>
+                          <input
+                            type="text"
+                            value={plans[activePlanIndex].bookId || ''}
+                            onChange={(e) => handlePlanChange(activePlanIndex, 'bookId', e.target.value)}
+                            placeholder="Enter unique book identifier"
+                            className={errors[`bookId-${activePlanIndex}`] ? 'error' : ''}
+                          />
+                          {errors[`bookId-${activePlanIndex}`] && (
+                            <p className="error-text">{errors[`bookId-${activePlanIndex}`]}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="plan-save-footer">
                       <button
                         type="button"
-                        className={`plan-save-btn ${(plans[activePlanIndex].lastSaved && !plans[activePlanIndex].isModified) ? 'completed' : ''}`}
+                        className={`plan-save-btn ${(plans[activePlanIndex].lastSaved && !plans[activePlanIndex].isModified) ? 'completed' : ''} ${!isCurrentPlanValid() ? 'disabled' : ''}`}
                         onClick={() => handleSavePlan(activePlanIndex)}
-                        disabled={plans[activePlanIndex].isSaving}
+                        disabled={plans[activePlanIndex].isSaving || !isCurrentPlanValid()}
                       >
                         {plans[activePlanIndex].isSaving ? 'Saving Changes...' : (plans[activePlanIndex].lastSaved && !plans[activePlanIndex].isModified) ? '✓ Plan Synced' : 'Save Plan Details'}
                       </button>
                       {plans[activePlanIndex].lastSaved && (
                         <span className="sync-time">Last Synced: {plans[activePlanIndex].lastSaved}</span>
+                      )}
+                      {!isCurrentPlanValid() && (
+                        <p className="validation-hint">⚠️ Please fill all required fields before saving</p>
                       )}
                     </div>
                   </div>
@@ -481,12 +936,12 @@ const PlanCreationForm = () => {
           <div className="form-footer">
             <form onSubmit={handleSave}>
               <div className="footer-content">
-                {!plans.every(p => p.lastSaved && !p.isModified) && (
+                {!plans.every(p => (p.planId || (p.lastSaved && !p.isModified))) && (
                   <p className="save-hint">⚠️ All plans must be saved individually before finalizing.</p>
                 )}
                 <button
                   type="submit"
-                  className={`save-button ${!plans.every(p => p.lastSaved && !p.isModified) ? 'disabled' : ''}`}
+                  className={`save-button ${!plans.every(p => (p.planId || (p.lastSaved && !p.isModified))) ? 'disabled' : ''}`}
                 >
                   Complete Configuration
                 </button>
@@ -494,6 +949,30 @@ const PlanCreationForm = () => {
                 {submitMessage && <p className="success">{submitMessage}</p>}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {deleteModal.show && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Confirm Delete</h3>
+              <button className="modal-close" onClick={hideDeleteModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete this plan?</p>
+              <p className="modal-warning">This action cannot be undone.</p>
+            </div>
+            <div className="modal-footer">
+              <button className="modal-btn modal-btn-cancel" onClick={hideDeleteModal}>
+                Cancel
+              </button>
+              <button className="modal-btn modal-btn-delete" onClick={confirmDelete}>
+                Delete Plan
+              </button>
+            </div>
           </div>
         </div>
       )}
