@@ -66,7 +66,7 @@ http://localhost:3000/api/product-plans
 ### 2. Product Support
 The frontend supports these products:
 - AI Powered Course Creation
-- Designova AI
+- Designova
 - Athenora Live
 - E-Book Athena
 - Operon AI: ChatBot Agent

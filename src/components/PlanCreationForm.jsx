@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiEdit2, FiTrash2, FiDollarSign, FiCheck, FiX } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiDollarSign, FiCheck, FiX, FiClipboard } from 'react-icons/fi';
 import './PlanCreationForm.css';
 import productPlanService from '../services/productPlanService';
 
@@ -16,6 +16,7 @@ const PlanCreationForm = () => {
   const [filterType, setFilterType] = useState('all'); // Filter state
   const [showFilterDropdown, setShowFilterDropdown] = useState(false); // Dropdown state
   const [deleteModal, setDeleteModal] = useState({ show: false, planId: null, productId: null, planIndex: null }); // Delete modal state
+  const [copySuccess, setCopySuccess] = useState(null); // Copy feedback state
 
   // Utility functions for currency conversion
   const dollarsToCents = (dollars) => {
@@ -28,7 +29,7 @@ const PlanCreationForm = () => {
 
   const products = [
     { id: '325b5f10-640f-49f4-8ebf-a6aca823233c', name: 'E-Book Athena', desc: 'Create and sell digital e-books with AI assistance' },
-    { id: '5a75ebfd-ad81-49e4-8115-7040aff78030', name: 'Designova AI', desc: 'AI-powered design tool for creating stunning visuals' },
+    { id: '5a75ebfd-ad81-49e4-8115-7040aff78030', name: 'Designova', desc: 'AI-powered design tool for creating stunning visuals' },
     // Add other products here as you get their UUIDs from backend
     // { id: 'another-uuid-here', name: 'AI Powered Course Creation', desc: 'Design complete, interaction-rich learning experiences in 15 minutes.' },
     // { id: 'another-uuid-here', name: 'Athenora Live', desc: '' },
@@ -38,6 +39,10 @@ const PlanCreationForm = () => {
   ];
 
   const intervalOptions = ['MONTH', 'YEAR', 'DAY', 'WEEK'];
+  const currencyOptions = [
+    { code: 'usd', symbol: '$', name: 'USD - US Dollar' },
+    { code: 'cad', symbol: 'C$', name: 'CAD - Canadian Dollar' }
+  ];
   const DESC_LIMIT = 200;
 
   // Initialize or adjust plans when numPlans changes
@@ -53,7 +58,7 @@ const PlanCreationForm = () => {
               name: '',
               description: '',
               price: '',
-              currency: 'USD',
+              currency: 'usd',
               billingType: 'ONE_TIME',
               interval: 'MONTH',
               intervalCount: 1,
@@ -162,7 +167,7 @@ const PlanCreationForm = () => {
       name: plan.name,
       description: plan.description,
       price: dollarsToCents(plan.price), // Convert dollars to cents
-      currency: plan.currency || 'USD',
+      currency: plan.currency || 'usd',
       billingType: plan.billingType,
       interval: plan.interval,
       intervalCount: plan.intervalCount,
@@ -354,7 +359,7 @@ const PlanCreationForm = () => {
       name: plan.name,
       description: plan.description,
       price: dollarsToCents(plan.price), // Convert dollars to cents
-      currency: plan.currency || 'USD',
+      currency: plan.currency || 'usd',
       billingType: plan.billingType,
       interval: plan.interval,
       intervalCount: plan.intervalCount,
@@ -712,12 +717,28 @@ const PlanCreationForm = () => {
                           <div className="plan-header">
                             <h4 className="plan-name">{plan.name}</h4>
                             <div className="plan-price">
-                              <FiDollarSign className="price-icon" />
+                              <span className="price-icon">
+                                {currencyOptions.find(c => c.code === (plan.currency || 'usd'))?.symbol || '$'}
+                              </span>
                               <span>{plan.price}</span>
                             </div>
                           </div>
                           {plan.description && (
                             <p className="plan-description">{plan.description}</p>
+                          )}
+                          {/* Plan ID Display */}
+                          {plan.planId && (
+                            <div className="plan-id-display-list">
+                              <span className="plan-id-label">Plan ID:</span>
+                              <span className="plan-id-value">{plan.planId}</span>
+                              <button 
+                                className="copy-id-btn"
+                                onClick={() => navigator.clipboard.writeText(plan.planId)}
+                                title="Copy Plan ID"
+                              >
+                                <FiClipboard />
+                              </button>
+                            </div>
                           )}
                           <div className="plan-meta">
                             <span className={`plan-billing ${plan.billingType === 'RECURRING' ? 'recurring' : ''}`}>
@@ -812,6 +833,32 @@ const PlanCreationForm = () => {
                     </label>
                   </div>
 
+                  {/* Plan ID Section - Show only after plan is saved */}
+                  {plans[activePlanIndex].planId && (
+                    <div className="plan-id-section">
+                      <div className="section-label">Plan ID</div>
+                      <div className="plan-id-display">
+                        <span className="plan-id-text">{plans[activePlanIndex].planId}</span>
+                        <button 
+                          className={`copy-btn ${copySuccess === 'copied' ? 'success' : copySuccess === 'error' ? 'error' : ''}`}
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(plans[activePlanIndex].planId);
+                              setCopySuccess('copied');
+                              setTimeout(() => setCopySuccess(null), 2000);
+                            } catch (err) {
+                              setCopySuccess('error');
+                              setTimeout(() => setCopySuccess(null), 2000);
+                            }
+                          }}
+                          title="Copy Plan ID"
+                        >
+                          {copySuccess === 'copied' ? '✅ Copied!' : copySuccess === 'error' ? '❌ Failed' : '📋 Copy'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="card-body">
                     <div className="field">
                       <label>Display Name*</label>
@@ -877,17 +924,33 @@ const PlanCreationForm = () => {
 
                     <div className="price-section">
                       <label className="section-label">Pricing</label>
-                      <div className="price-box">
-                        <span className="currency-symbol">$</span>
-                        <input
-                          type="number"
-                          min="1"
-                          value={plans[activePlanIndex].price}
-                          onChange={(e) => handlePlanChange(activePlanIndex, 'price', e.target.value)}
-                          className={errors[`price-${activePlanIndex}`] ? 'error' : ''}
-                          placeholder="0"
-                        />
-                        <span className="currency-code">USD</span>
+                      <div className="price-input-row">
+                        <div className="currency-selector">
+                          <select
+                            value={plans[activePlanIndex].currency || 'usd'}
+                            onChange={(e) => handlePlanChange(activePlanIndex, 'currency', e.target.value)}
+                            className="currency-select"
+                          >
+                            {currencyOptions.map(currency => (
+                              <option key={currency.code} value={currency.code}>
+                                {currency.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="price-box">
+                          <span className="currency-symbol">
+                            {currencyOptions.find(c => c.code === (plans[activePlanIndex].currency || 'usd'))?.symbol || '$'}
+                          </span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={plans[activePlanIndex].price}
+                            onChange={(e) => handlePlanChange(activePlanIndex, 'price', e.target.value)}
+                            className={errors[`price-${activePlanIndex}`] ? 'error' : ''}
+                            placeholder="0"
+                          />
+                        </div>
                       </div>
                     </div>
 
