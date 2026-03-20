@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiEdit2, FiTrash2, FiDollarSign, FiCheck, FiX, FiClipboard } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiDollarSign, FiCheck, FiX, FiClipboard, FiSearch, FiInbox } from 'react-icons/fi';
 import './PlanCreationForm.css';
 import productPlanService from '../services/productPlanService';
 
@@ -17,6 +17,7 @@ const PlanCreationForm = () => {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false); // Dropdown state
   const [deleteModal, setDeleteModal] = useState({ show: false, planId: null, productId: null, planIndex: null }); // Delete modal state
   const [copySuccess, setCopySuccess] = useState(null); // Copy feedback state
+  const [searchTerm, setSearchTerm] = useState(''); // Search state
 
   // Utility functions for currency conversion
   const dollarsToCents = (dollars) => {
@@ -299,17 +300,39 @@ const PlanCreationForm = () => {
     }, 1500);
   };
 
-  const startEdit = (config, initialPlanIndex = 0) => {
+  const startEdit = (config, initialPlanIndex = null) => {
     setSelectedProduct(config.productId);
-    setNumPlans(config.plans.length);
-    const plansWithFlags = config.plans.map(p => ({
-      ...p,
-      isModified: false,
-      isSaving: false,
-      lastSaved: new Date().toLocaleTimeString()
-    }));
-    setPlans(plansWithFlags);
-    setActivePlanIndex(initialPlanIndex);
+    
+    // Check if editing all plans or just one plan
+    if (initialPlanIndex === null) {
+      // Edit all plans
+      setNumPlans(config.plans.length);
+      const plansWithFlags = config.plans.map(p => ({
+        ...p,
+        // Load bookId from metadata for E-Book plans
+        bookId: p.metadata?.bookId || p.bookId || '',
+        isModified: false,
+        isSaving: false,
+        lastSaved: new Date().toLocaleTimeString()
+      }));
+      setPlans(plansWithFlags);
+      setActivePlanIndex(0);
+    } else {
+      // Edit single plan only
+      setNumPlans(1);
+      const planToEdit = config.plans[initialPlanIndex];
+      const plansWithFlags = [{
+        ...planToEdit,
+        // Load bookId from metadata for E-Book plans
+        bookId: planToEdit.metadata?.bookId || planToEdit.bookId || '',
+        isModified: false,
+        isSaving: false,
+        lastSaved: new Date().toLocaleTimeString()
+      }];
+      setPlans(plansWithFlags);
+      setActivePlanIndex(0);
+    }
+    
     setView('edit');
   };
 
@@ -578,20 +601,39 @@ const PlanCreationForm = () => {
     }
   };
 
-  // Filter plans based on selected filter type
+  // Filter plans based on selected filter type and search term
   const filterPlans = (plans) => {
+    let filtered = plans;
+    
+    // First apply the type filter
     switch (filterType) {
       case 'recurring':
-        return plans.filter(plan => plan.billingType === 'RECURRING');
+        filtered = plans.filter(plan => plan.billingType === 'RECURRING');
+        break;
       case 'onetime':
-        return plans.filter(plan => plan.billingType === 'ONE_TIME');
+        filtered = plans.filter(plan => plan.billingType === 'ONE_TIME');
+        break;
       case 'active':
-        return plans.filter(plan => plan.isActive === true);
+        filtered = plans.filter(plan => plan.isActive === true);
+        break;
       case 'inactive':
-        return plans.filter(plan => plan.isActive === false);
+        filtered = plans.filter(plan => plan.isActive === false);
+        break;
       default:
-        return plans; // 'all' case
+        filtered = plans;
     }
+
+    // Then apply search filter if present
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(plan => 
+        plan.name.toLowerCase().includes(term) || 
+        (plan.description && plan.description.toLowerCase().includes(term)) ||
+        (plan.planId && plan.planId.toLowerCase().includes(term))
+      );
+    }
+
+    return filtered;
   };
 
   const activeConfig = savedConfigs.find(c => c.productId === previewProductId);
@@ -652,47 +694,70 @@ const PlanCreationForm = () => {
                     <p>Last updated: {activeConfig.timestamp}</p>
                   </div>
                   <div className="header-actions">
+                    <div className="search-box">
+                      <FiSearch className="search-icon" />
+                      <input 
+                        type="text" 
+                        placeholder="Search plans..." 
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="search-input"
+                      />
+                      {searchTerm && (
+                        <button className="clear-search" onClick={() => setSearchTerm('')}>
+                          <FiX />
+                        </button>
+                      )}
+                    </div>
                     <div className="filter-dropdown">
                       <button 
-                        className="filter-dropdown-btn"
+                        className={`filter-dropdown-btn ${showFilterDropdown ? 'active' : ''}`}
                         onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                       >
-                        <span className="filter-label-text">{getFilterLabel()} ({getFilterCount()})</span>
+                        <span className="filter-label-text">{getFilterLabel()}</span>
+                        <span className="filter-count" style={{marginLeft: 'auto', marginRight: '0.5rem'}}>{getFilterCount()}</span>
                         <span className={`dropdown-arrow ${showFilterDropdown ? 'open' : ''}`}>▼</span>
                       </button>
+
                       {showFilterDropdown && (
                         <div className="dropdown-menu">
                           <button
                             className={`dropdown-item ${filterType === 'all' ? 'active' : ''}`}
                             onClick={() => { setFilterType('all'); setShowFilterDropdown(false); }}
                           >
-                            All Plans ({activeConfig.plans.length})
+                            <span>All Plans</span>
+                            <span className="filter-count">{activeConfig.plans.length}</span>
                           </button>
                           <button
                             className={`dropdown-item ${filterType === 'recurring' ? 'active' : ''}`}
                             onClick={() => { setFilterType('recurring'); setShowFilterDropdown(false); }}
                           >
-                            Recurring ({activeConfig.plans.filter(p => p.billingType === 'RECURRING').length})
+                            <span>Recurring</span>
+                            <span className="filter-count">{activeConfig.plans.filter(p => p.billingType === 'RECURRING').length}</span>
                           </button>
                           <button
                             className={`dropdown-item ${filterType === 'onetime' ? 'active' : ''}`}
                             onClick={() => { setFilterType('onetime'); setShowFilterDropdown(false); }}
                           >
-                            One-Time ({activeConfig.plans.filter(p => p.billingType === 'ONE_TIME').length})
+                            <span>One-Time</span>
+                            <span className="filter-count">{activeConfig.plans.filter(p => p.billingType === 'ONE_TIME').length}</span>
                           </button>
                           <button
                             className={`dropdown-item ${filterType === 'active' ? 'active' : ''}`}
                             onClick={() => { setFilterType('active'); setShowFilterDropdown(false); }}
                           >
-                            Active ({activeConfig.plans.filter(p => p.isActive === true).length})
+                            <span>Active</span>
+                            <span className="filter-count">{activeConfig.plans.filter(p => p.isActive === true).length}</span>
                           </button>
                           <button
                             className={`dropdown-item ${filterType === 'inactive' ? 'active' : ''}`}
                             onClick={() => { setFilterType('inactive'); setShowFilterDropdown(false); }}
                           >
-                            Inactive ({activeConfig.plans.filter(p => p.isActive === false).length})
+                            <span>Inactive</span>
+                            <span className="filter-count">{activeConfig.plans.filter(p => p.isActive === false).length}</span>
                           </button>
                         </div>
+
                       )}
                     </div>
                     <button onClick={() => startEdit(activeConfig)} className="edit-config-btn">
@@ -704,13 +769,31 @@ const PlanCreationForm = () => {
                 <div className="plans-list">
                   {filteredPlans.length === 0 ? (
                     <div className="no-plans-list">
-                      <FiX className="no-plans-icon" />
-                      <p>No plans found for the selected filter.</p>
-                      <button onClick={() => setFilterType('all')} className="plan-edit-btn">
-                        Show All Plans
-                      </button>
+                      <div className="empty-state-icon-container">
+                        {searchTerm ? <FiSearch className="empty-state-icon" /> : <FiInbox className="empty-state-icon" />}
+                        <FiX className="empty-state-cross" />
+                      </div>
+                      <div className="empty-state-content">
+                        <h3>{searchTerm ? 'No matches found' : 'No plans available'}</h3>
+                        <p>
+                          {searchTerm 
+                            ? `We couldn't find any plans matching "${searchTerm}". Try a different term or clear your search.` 
+                            : "There are no plans matching the selected filter criteria at this time."}
+                        </p>
+                        <button 
+                          onClick={() => {
+                            if (searchTerm) setSearchTerm('');
+                            setFilterType('all');
+                          }} 
+                          className="empty-state-action-btn"
+                        >
+                          {searchTerm ? "Clear Search" : "Show All Plans"}
+                        </button>
+                      </div>
                     </div>
+
                   ) : (
+
                     filteredPlans.map((plan, idx) => (
                       <div key={idx} className="plan-item">
                         <div className="plan-main-info">
@@ -833,32 +916,6 @@ const PlanCreationForm = () => {
                     </label>
                   </div>
 
-                  {/* Plan ID Section - Show only after plan is saved */}
-                  {plans[activePlanIndex].planId && (
-                    <div className="plan-id-section">
-                      <div className="section-label">Plan ID</div>
-                      <div className="plan-id-display">
-                        <span className="plan-id-text">{plans[activePlanIndex].planId}</span>
-                        <button 
-                          className={`copy-btn ${copySuccess === 'copied' ? 'success' : copySuccess === 'error' ? 'error' : ''}`}
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(plans[activePlanIndex].planId);
-                              setCopySuccess('copied');
-                              setTimeout(() => setCopySuccess(null), 2000);
-                            } catch (err) {
-                              setCopySuccess('error');
-                              setTimeout(() => setCopySuccess(null), 2000);
-                            }
-                          }}
-                          title="Copy Plan ID"
-                        >
-                          {copySuccess === 'copied' ? '✅ Copied!' : copySuccess === 'error' ? '❌ Failed' : '📋 Copy'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
                   <div className="card-body">
                     <div className="field">
                       <label>Display Name*</label>
@@ -975,6 +1032,32 @@ const PlanCreationForm = () => {
                     )}
 
                     <div className="plan-save-footer">
+                      {/* Plan ID Display - Show only after plan is saved */}
+                      {plans[activePlanIndex].planId && (
+                        <div className="plan-id-save-section">
+                          <span className="plan-id-label">PLAN ID</span>
+                          <div className="plan-id-save-display">
+                            <span className="plan-id-value">{plans[activePlanIndex].planId}</span>
+                            <button 
+                              className="copy-save-btn"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(plans[activePlanIndex].planId);
+                                  setCopySuccess('copied');
+                                  setTimeout(() => setCopySuccess(null), 2000);
+                                } catch (err) {
+                                  setCopySuccess('error');
+                                  setTimeout(() => setCopySuccess(null), 2000);
+                                }
+                              }}
+                              title="Copy Plan ID"
+                            >
+                              {copySuccess === 'copied' ? '✅ Copied!' : copySuccess === 'error' ? '❌ Failed' : <><FiClipboard /> Copy</>}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
                       <button
                         type="button"
                         className={`plan-save-btn ${(plans[activePlanIndex].lastSaved && !plans[activePlanIndex].isModified) ? 'completed' : ''} ${!isCurrentPlanValid() ? 'disabled' : ''}`}
