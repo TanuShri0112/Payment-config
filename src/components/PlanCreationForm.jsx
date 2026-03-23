@@ -41,8 +41,9 @@ const PlanCreationForm = () => {
   };
 
   const products = [
-    { id: '325b5f10-640f-49f4-8ebf-a6aca823233c', name: 'E-Book Athena', desc: 'Create and sell digital e-books with AI assistance' },
-    { id: '5a75ebfd-ad81-49e4-8115-7040aff78030', name: 'Designova', desc: 'AI-powered design tool for creating stunning visuals' },
+    // { id: '325b5f10-640f-49f4-8ebf-a6aca823233c', name: 'E-Book Athena', desc: 'Create and sell digital e-books with AI assistance' },
+    // { id: '5a75ebfd-ad81-49e4-8115-7040aff78030', name: 'Designova', desc: 'AI-powered design tool for creating stunning visuals' },
+    { id: '63257f09-00b9-44eb-8d3b-daf77e033ad5', name: 'Lesson Editor', desc: 'Create and manage interactive lessons with AI-powered tools' },
     // Add other products here as you get their UUIDs from backend
     // { id: 'another-uuid-here', name: 'AI Powered Course Creation', desc: 'Design complete, interaction-rich learning experiences in 15 minutes.' },
     // { id: 'another-uuid-here', name: 'Athenora Live', desc: '' },
