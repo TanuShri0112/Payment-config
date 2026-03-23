@@ -18,6 +18,7 @@ const PlanCreationForm = () => {
   const [deleteModal, setDeleteModal] = useState({ show: false, planId: null, productId: null, planIndex: null }); // Delete modal state
   const [copySuccess, setCopySuccess] = useState(null); // Copy feedback state
   const [searchTerm, setSearchTerm] = useState(''); // Search state
+  const [copyingId, setCopyingId] = useState(null); // Track which plan ID is being copied
 
   // Utility functions for currency conversion
   const dollarsToCents = (dollars) => {
@@ -26,6 +27,17 @@ const PlanCreationForm = () => {
 
   const centsToDollars = (cents) => {
     return (cents / 100).toFixed(2);
+  };
+
+  // Reusable copy handler with icon transformation
+  const handleCopyWithIcon = async (text, buttonId) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyingId(buttonId); // Show tick icon for this specific button
+      setTimeout(() => setCopyingId(null), 3000); // Revert after 3 seconds
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
   };
 
   const products = [
@@ -816,10 +828,10 @@ const PlanCreationForm = () => {
                               <span className="plan-id-value">{plan.planId}</span>
                               <button 
                                 className="copy-id-btn"
-                                onClick={() => navigator.clipboard.writeText(plan.planId)}
+                                onClick={() => handleCopyWithIcon(plan.planId, `list-${plan.planId}`)}
                                 title="Copy Plan ID"
                               >
-                                <FiClipboard />
+                                {copyingId === `list-${plan.planId}` ? <FiCheck /> : <FiClipboard />}
                               </button>
                             </div>
                           )}
@@ -1040,19 +1052,10 @@ const PlanCreationForm = () => {
                             <span className="plan-id-value">{plans[activePlanIndex].planId}</span>
                             <button 
                               className="copy-save-btn"
-                              onClick={async () => {
-                                try {
-                                  await navigator.clipboard.writeText(plans[activePlanIndex].planId);
-                                  setCopySuccess('copied');
-                                  setTimeout(() => setCopySuccess(null), 2000);
-                                } catch (err) {
-                                  setCopySuccess('error');
-                                  setTimeout(() => setCopySuccess(null), 2000);
-                                }
-                              }}
+                              onClick={() => handleCopyWithIcon(plans[activePlanIndex].planId, 'save-footer')}
                               title="Copy Plan ID"
                             >
-                              {copySuccess === 'copied' ? '✅ Copied!' : copySuccess === 'error' ? '❌ Failed' : <><FiClipboard /> Copy</>}
+                              {copyingId === 'save-footer' ? <FiCheck /> : <><FiClipboard /> Copy</>}
                             </button>
                           </div>
                         </div>
