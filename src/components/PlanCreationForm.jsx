@@ -117,11 +117,11 @@ const PlanCreationForm = () => {
       if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) newErrors[`price-${index}`] = 'Invalid';
       
       // Validate book ID for E-Book product with one-time payment
-      if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
-        if (!plan.bookId || plan.bookId.trim() === '') {
-          newErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
-        }
-      }
+      // if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+      //   if (!plan.bookId || plan.bookId.trim() === '') {
+      //     newErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
+      //   }
+      // }
     });
 
     setErrors(newErrors);
@@ -137,11 +137,11 @@ const PlanCreationForm = () => {
     if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) newErrors[`price-${index}`] = 'Invalid';
     
     // Validate book ID for E-Book product with one-time payment
-    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
-      if (!plan.bookId || plan.bookId.trim() === '') {
-        newErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
-      }
-    }
+    // if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+    //   if (!plan.bookId || plan.bookId.trim() === '') {
+    //     newErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
+    //   }
+    // }
 
     setErrors(prev => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).every(key => !key.endsWith(`-${index}`) && key !== 'product') ||
@@ -163,11 +163,11 @@ const PlanCreationForm = () => {
     if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) planErrors[`price-${index}`] = 'Invalid';
     
     // Validate book ID for E-Book product with one-time payment
-    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
-      if (!plan.bookId || plan.bookId.trim() === '') {
-        planErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
-      }
-    }
+    // if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+    //   if (!plan.bookId || plan.bookId.trim() === '') {
+    //     planErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
+    //   }
+    // }
 
     if (Object.keys(planErrors).length > 0) {
       setErrors(prev => ({ ...prev, ...planErrors }));
@@ -189,9 +189,9 @@ const PlanCreationForm = () => {
     };
 
     // Add book ID to metadata for E-Book product with one-time payment
-    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME' && plan.bookId) {
-      planPayload.metadata.bookId = plan.bookId;
-    }
+    // if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME' && plan.bookId) {
+    //   planPayload.metadata.bookId = plan.bookId;
+    // }
 
     console.log('Saving individual plan to backend:', planPayload);
 
@@ -377,11 +377,11 @@ const PlanCreationForm = () => {
     if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) planErrors[`price-${index}`] = 'Invalid';
     
     // Validate book ID for E-Book product with one-time payment
-    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
-      if (!plan.bookId || plan.bookId.trim() === '') {
-        planErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
-      }
-    }
+    // if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+    //   if (!plan.bookId || plan.bookId.trim() === '') {
+    //     planErrors[`bookId-${index}`] = 'Book ID is required for E-Book one-time payment';
+    //   }
+    // }
 
     if (Object.keys(planErrors).length > 0) {
       setErrors(prev => ({ ...prev, ...planErrors }));
@@ -403,9 +403,9 @@ const PlanCreationForm = () => {
     };
 
     // Add book ID to metadata for E-Book product with one-time payment
-    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME' && plan.bookId) {
-      planPayload.metadata.bookId = plan.bookId;
-    }
+    // if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME' && plan.bookId) {
+    //   planPayload.metadata.bookId = plan.bookId;
+    // }
 
     console.log('Updating plan to backend:', planPayload);
 
@@ -514,9 +514,9 @@ const PlanCreationForm = () => {
     if (!plan.price || isNaN(plan.price) || Number(plan.price) <= 0) return false;
     
     // Check book ID for E-Book product with one-time payment
-    if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
-      if (!plan.bookId || plan.bookId.trim() === '') return false;
-    }
+    // if (selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plan.billingType === 'ONE_TIME') {
+    //   if (!plan.bookId || plan.bookId.trim() === '') return false;
+    // }
     
     return true;
   };
@@ -1024,7 +1024,7 @@ const PlanCreationForm = () => {
                     </div>
 
                     {/* Book ID field - only for E-Book product with one-time payment */}
-                    {selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plans[activePlanIndex].billingType === 'ONE_TIME' && (
+                    {/* {selectedProduct === '325b5f10-640f-49f4-8ebf-a6aca823233c' && plans[activePlanIndex].billingType === 'ONE_TIME' && (
                       <div className="book-id-section">
                         <label className="section-label">Book Information</label>
                         <div className="field">
@@ -1041,7 +1041,7 @@ const PlanCreationForm = () => {
                           )}
                         </div>
                       </div>
-                    )}
+                    )} */}
 
                     <div className="plan-save-footer">
                       {/* Plan ID Display - Show only after plan is saved */}
