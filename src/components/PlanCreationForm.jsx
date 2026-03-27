@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiEdit2, FiTrash2, FiDollarSign, FiCheck, FiX, FiClipboard, FiSearch, FiInbox } from 'react-icons/fi';
+import { FiEdit2, FiTrash2, FiDollarSign, FiCheck, FiX, FiClipboard, FiSearch, FiInbox, FiPlus } from 'react-icons/fi';
 import './PlanCreationForm.css';
 import productPlanService from '../services/productPlanService';
 
@@ -43,7 +43,7 @@ const PlanCreationForm = () => {
   const products = [
     { id: '325b5f10-640f-49f4-8ebf-a6aca823233c', name: 'E-Book Athena', desc: 'Create and sell digital e-books with AI assistance' },
     { id: '5a75ebfd-ad81-49e4-8115-7040aff78030', name: 'Designova', desc: 'AI-powered design tool for creating stunning visuals' },
-    { id: 'a742b304-7b32-4c77-a0c7-b4afe557e364', name: 'Creditor Academy', desc: 'Comprehensive credit management and training platform' },
+    { id: 'a742b304-7b32-4c77-a0c7-b4afe557e364', name: 'LMS Athena', desc: 'Comprehensive credit management and training platform' },
     // { id: 'pk_prod_lmsathena_f929699db783a2e437c7ee259143924d2c66a602213f1ba40cc4d967121315df', name: 'LMS Athena', desc: 'Advanced learning management system for educational institutions' },
     // Add other products here as you get their UUIDs from backend
     // { id: 'another-uuid-here', name: 'AI Powered Course Creation', desc: 'Design complete, interaction-rich learning experiences in 15 minutes.' },
@@ -703,7 +703,16 @@ const PlanCreationForm = () => {
               <>
                 <div className="preview-header">
                   <div className="preview-meta">
-                    <h3>{activeConfig.productName} Plans</h3>
+                    <div className="product-title-with-add">
+                      <h3>{activeConfig.productName} Plans</h3>
+                      <button 
+                        className="add-plan-inline-btn"
+                        onClick={() => addNew(activeConfig.productId)}
+                        title="Add new plan"
+                      >
+                        <FiPlus /> Add Plan
+                      </button>
+                    </div>
                     <p>Last updated: {activeConfig.timestamp}</p>
                   </div>
                   <div className="header-actions">
